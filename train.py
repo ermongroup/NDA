@@ -218,7 +218,7 @@ def run(config):
 
             # Test every specified interval
             # First load celeba moments
-            data_moments = '/atlas/u/tsong/data/fid/fid_stats_cifar10_train.npz'
+            data_moments = 'fid_stats_cifar10_train.npz'
             experiment_name = (config['experiment_name'] if config['experiment_name']
                                else utils.name_from_config(config))
             if (not (state_dict['itr'] % config['test_every'])) and (epoch >= config['start_eval']):
