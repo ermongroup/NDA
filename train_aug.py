@@ -174,7 +174,6 @@ def run(config):
     print('Total training epochs ',  config['num_epochs'])
     print("the dataset is ", config['dataset'], )
     if config['dataset'] == 'C10U' or config['dataset'] == 'C10':
-        #data_moments = '/atlas/u/tsong/data/fid/fid_stats_cifar10_train.npz'
         data_moments = 'cifar10_10k_stats.npz'
  
     else :
