@@ -53,73 +53,35 @@ def shifted(img) :
     new_data[:,:,k:,:k] = img[:,:,:-k,-k:]
     return new_data
 
-def jigsaw_k(data, k = 4) :
-    actual_h = data.size()[2]
-    actual_w = data.size()[3]
-    h = torch.split(data, int(actual_h/k), dim = 2)
-    splits = []
-    for i in range(k) :
-        splits += torch.split(h[i], int(actual_w/k), dim = 3)
-    fake_samples = torch.stack(splits, -1)
-    for idx in range(fake_samples.size()[0]) :
-        fake_samples[idx] = fake_samples[idx,:,:,:,torch.randperm(k*k)]
-    fake_samples = torch.split(fake_samples, 1, dim=4)
-    merged = []
-    for i in range(k) :
-        merged += [torch.cat(fake_samples[i*k:(i+1)*k], 2)]
-    fake_samples = torch.squeeze(torch.cat(merged, 3), -1)
-    return fake_samples
+def get_perm(l) :
+    perm = torch.randperm(l)
+    while torch.all(torch.eq(perm, torch.arange(l))) :
+        perm = torch.randperm(l)
+    return perm
 
-def rand_jigsaw(data) :
-    K = [2,4]
-    idx = (len(K)) * torch.rand(1)
-    idx = idx.long().item()
-    k = K[idx]
-    return jigsaw_k(data, k)
-
-def curriculum_jigsaw(data, epoch, config) :
-    if epoch <= config['curriculum_epochs'] :
-        k = 4
-    else :
-        k = 2 
-    return jigsaw_k(data, k)
-
-def permutation(data) :
-    indices = torch.randperm(data.size(0))
-    return data[indices]
-
-def stitch_other_data(data, k = 2, other_data = None) :
-    if other_data is None :
-        data_perm = permutation(data)
-    else :
-        if torch.randint(0, 2, (1,))[0].item() == 0 :
-            data_perm = other_data
-        else :
-            data_perm = permutation(data)
-    actual_h = data.size()[2]
-    actual_w = data.size()[3]
-    if torch.randint(0, 2, (1,))[0].item() == 0 :
-        dim0, dim1 = 2,3
-    else :
-        dim0, dim1 = 3,2
-
-    h = torch.split(data, int(actual_h/k), dim = dim0)
-    h_1 = torch.split(data_perm, int(actual_h/k), dim = dim0)
-    splits = []
-    for i in range(k) :
-        if i < int(k/2) :
-            splits += torch.split(h[i], int(actual_w/k), dim = dim1)
-        else :
-            splits += torch.split(h_1[i], int(actual_w/k), dim = dim1)
-    merged = []
-    for i in range(k) :
-        merged += [torch.cat(splits[i*k:(i+1)*k], dim1)]
-    fake_samples = torch.cat(merged, dim0)
-
-    return fake_samples
+def jigsaw_k(data, k = 2) :
+    with torch.no_grad() :
+        actual_h = data.size()[2]
+        actual_w = data.size()[3]
+        h = torch.split(data, int(actual_h/k), dim = 2)
+        splits = []
+        for i in range(k) :
+            splits += torch.split(h[i], int(actual_w/k), dim = 3)
+        fake_samples = torch.stack(splits, -1)
+        for idx in range(fake_samples.size()[0]) :
+            perm = get_perm(k*k)
+            # fake_samples[idx] = fake_samples[idx,:,:,:,torch.randperm(k*k)]
+            fake_samples[idx] = fake_samples[idx,:,:,:,perm]
+        fake_samples = torch.split(fake_samples, 1, dim=4)
+        merged = []
+        for i in range(k) :
+            merged += [torch.cat(fake_samples[i*k:(i+1)*k], 2)]
+        fake_samples = torch.squeeze(torch.cat(merged, 3), -1)
+        return fake_samples
 
 def stitch(data, k = 2) :
-    indices = torch.randperm(data.size(0))
+    #  = torch.randperm()
+    indices = get_perm(data.size(0))
     data_perm = data[indices]
     actual_h = data.size()[2]
     actual_w = data.size()[3]
@@ -142,32 +104,13 @@ def stitch(data, k = 2) :
     fake_samples = torch.cat(merged, dim0)
 
     return fake_samples
-        
-def mixup(data, alpha = 1.0) :
+
+def mixup(data, alpha = 25.0) :
     lamb = np.random.beta(alpha, alpha)
-    indices = torch.randperm(data.size(0))
+    # indices = torch.randperm(data.size(0))
+    indices = get_perm(data.size(0))
     data_perm = data[indices]
     return data*lamb + (1-lamb)*data_perm
-    
-def noise(data) :
-    return (torch.rand_like(data) - 0.5)/0.5
-
-
-def rand_blur(data) :
-    min_k, max_k = 10, 20
-    data = data.clone()
-    h, w = data.size(2), data.size(3)
-    b_size = data.size(0)
-    for i in range(b_size) :
-        k = (min_k + (max_k - min_k) * torch.rand(1)).long().item()
-        h_pos = ((h - k) * torch.rand(1)).long().item()
-        w_pos = ((w - k) * torch.rand(1)).long().item()
-        patch = data[i,:,h_pos:h_pos+k,w_pos:w_pos+k]
-        patch_mean = torch.mean(patch, axis = (1,2), keepdim = True)
-        data[i,:,h_pos:h_pos+k,w_pos:w_pos+k] = torch.ones_like(patch) * patch_mean
-
-    return data
- 
 
 def rand_bbox(size, lam):
     W = size[2]
@@ -187,13 +130,26 @@ def rand_bbox(size, lam):
 
     return bbx1, bby1, bbx2, bby2
 
+def cutout(data) :
+    min_k, max_k = 10, 20
+    data = data.clone()
+    h, w = data.size(2), data.size(3)
+    b_size = data.size(0)
+    for i in range(b_size) :
+        k = (min_k + (max_k - min_k) * torch.rand(1)).long().item()
+        h_pos = ((h - k) * torch.rand(1)).long().item()
+        w_pos = ((w - k) * torch.rand(1)).long().item()
+        patch = data[i,:,h_pos:h_pos+k,w_pos:w_pos+k]
+        patch_mean = torch.mean(patch, axis = (1,2), keepdim = True)
+        data[i,:,h_pos:h_pos+k,w_pos:w_pos+k] = torch.ones_like(patch) * patch_mean
+
+    return data
 
 def cut_mix(data, beta = 1.0) :
     data = data.clone()
     lam = np.random.beta(beta, beta)
-    #rand_index = torch.randperm(data.size()[0]).cuda()
-    #data_perm = data[rand_index]
-    data_perm = permutation(data)
+    indices = get_perm(data.size(0))
+    data_perm = data[indices]
     bbx1, bby1, bbx2, bby2 = rand_bbox(data.size(), lam)
     data[:, :, bbx1:bbx2, bby1:bby2] = data_perm[:, :, bbx1:bbx2, bby1:bby2] 
     return data
@@ -242,7 +198,7 @@ def GAN_training_function(G, D, GD, z_, y_, ema, state_dict, config):
                 real_fake_samples = jigsaw_k(real_samples, k = 2)  
                 # real_fake_samples = stitch(real_samples, k = 2)
                 # real_fake_samples = mixup(real_samples, alpha = 25.0)
-                #real_fake_samples = rand_blur(real_samples)
+                #real_fake_samples = cutout(real_samples)
                 #real_fake_samples = cut_mix(real_samples)
 
                 D_fake, D_real, D_real_fake = GD(z_[:config['batch_size']], y_[:config['batch_size']], real_samples, real_fake_samples,
