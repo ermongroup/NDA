@@ -240,15 +240,8 @@ def GAN_training_function(G, D, GD, z_, y_, ema, state_dict, config):
                 
                 real_samples = x[counter]
                 real_fake_samples = jigsaw_k(real_samples, k = 2)  
-                #real_fake_samples = shifted(real_samples, k = 2)
-                #real_fake_samples = shifted(jigsaw_k(real_samples, k = 2))
-                #real_fake_samples = rand_jigsaw(real_samples)
-                #real_fake_samples = curriculum_jigsaw(real_samples, state_dict['epoch'], config)
                 # real_fake_samples = stitch(real_samples, k = 2)
                 # real_fake_samples = mixup(real_samples, alpha = 25.0)
-                #real_fake_samples = noise(real_samples)
-                #real_fake_samples = jigsaw_k(fake_dataset(real_samples, state_dict, counter), k = 2)
-                #real_fake_samples = stitch(real_samples, other_data = fake_dataset(real_samples, state_dict, counter))
                 #real_fake_samples = rand_blur(real_samples)
                 #real_fake_samples = cut_mix(real_samples)
 
