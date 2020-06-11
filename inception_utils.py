@@ -282,7 +282,7 @@ def prepare_inception_metrics(dataset, parallel, no_fid=False):
     # the script will crash here if it cannot find the Inception moments.
     # By default, remove the "hdf5" from dataset
     dataset = dataset.strip('_hdf5')
-    moments = np.load('/atlas/u/tsong/data/fid/fid_stats_celeba.npz')
+    moments = np.load('./fid/fid_stats_celeba.npz')
     data_mu = moments['mu']
     data_sigma = moments['sigma']
     # data_mu = np.load(dataset+'_inception_moments.npz')['mu']
